@@ -1,122 +1,209 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState } from "react";
+import "./App.css";
+
+type BankResult = {
+  bankName: string;
+  status: "approved" | "rejected" | "unavailable";
+  message: string;
+  approvedAmount?: number;
+  interestRate?: number;
+};
+
+type SimulationResponse = {
+  simulationId: string;
+  results: BankResult[];
+};
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [salary, setSalary] = useState("");
+  const [employerCnpj, setEmployerCnpj] = useState("");
+
+  const [results, setResults] = useState<BankResult[]>([]);
+  const [simulationId, setSimulationId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setLoading(true);
+    setError("");
+    setResults([]);
+    setSimulationId("");
+
+    try {
+      const response = await fetch("http://localhost:3000/api/loans/simulate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          cpf,
+          salary: Number(salary),
+          employerCnpj,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Não foi possível realizar a simulação.",
+        );
+      }
+
+      const simulation = data as SimulationResponse;
+      setSimulationId(simulation.simulationId);
+      setResults(simulation.results);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro inesperado ao realizar a simulação.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function formatCurrency(value: number) {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+    <main className="app">
+      <section className="loan-card">
+        <span className="eyebrow">SIMULADOR DE CRÉDITO</span>
+
+        <h1>Simule seu empréstimo consignado</h1>
+
+        <p className="description">
+          Preencha seus dados para consultar as condições disponíveis nas
+          instituições participantes.
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="name">Nome completo</label>
+            <input
+              id="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Digite seu nome completo"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="email">E-mail</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="voce@exemplo.com"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="cpf">CPF (11 números)</label>
+            <input
+              id="cpf"
+              value={cpf}
+              onChange={(event) => setCpf(event.target.value)}
+              placeholder="12345678901"
+              inputMode="numeric"
+              maxLength={11}
+              pattern="[0-9]{11}"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="salary">Salário mensal (R$)</label>
+            <input
+              id="salary"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={salary}
+              onChange={(event) => setSalary(event.target.value)}
+              placeholder="2500"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="employerCnpj">
+              CNPJ do empregador (14 números)
+            </label>
+            <input
+              id="employerCnpj"
+              value={employerCnpj}
+              onChange={(event) => setEmployerCnpj(event.target.value)}
+              placeholder="12345678000199"
+              inputMode="numeric"
+              maxLength={14}
+              pattern="[0-9]{14}"
+              required
+            />
+          </div>
+
+          <button type="submit" disabled={loading}>
+            {loading ? "Consultando bancos..." : "Simular empréstimo"}
+          </button>
+        </form>
+
+        {error && (
+          <p className="error-message" role="alert">
+            {error}
           </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+        )}
+
+        {results.length > 0 && (
+          <section className="results" aria-live="polite">
+            <h2>Resultado da simulação</h2>
+
+            <p className="simulation-id">Protocolo: {simulationId}</p>
+
+            {results.map((bank) => (
+              <article className="bank-result" key={bank.bankName}>
+                <h3>{bank.bankName}</h3>
+
+                <p>
+                  Status:{" "}
+                  {bank.status === "approved"
+                    ? "Aprovado"
+                    : bank.status === "rejected"
+                      ? "Rejeitado"
+                      : "Indisponível"}
+                </p>
+
+                <p>{bank.message}</p>
+
+                {bank.approvedAmount !== undefined && (
+                  <p>Valor simulado: {formatCurrency(bank.approvedAmount)}</p>
+                )}
+
+                {bank.interestRate !== undefined && (
+                  <p>Taxa informada: {bank.interestRate}%</p>
+                )}
+              </article>
+            ))}
+          </section>
+        )}
       </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    </main>
+  );
 }
 
-export default App
+export default App;
