@@ -1,6 +1,8 @@
 import { useState } from "react";
 import "./App.css";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 type BankResult = {
   bankName: string;
   status: "approved" | "rejected" | "unavailable";
@@ -35,7 +37,7 @@ function App() {
     setSimulationId("");
 
     try {
-      const response = await fetch("http://localhost:3000/api/loans/simulate", {
+      const response = await fetch(`${API_URL}/api/loans/simulate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
